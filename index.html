@@ -137,10 +137,12 @@ const NX = PREFILL.next || null, PV = PREFILL.prev || null;
 const ymdLocal = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 if (!state.cleaned) state.cleaned = ymdLocal(new Date());
 if (NX) { state.arrival = NX.in; state.departure = NX.out; for (const id of ['lbl-arrival', 'lbl-departure', 'lbl-same']) $(id).hidden = true; }
-if (NX && NX.guests) { state.guests = String(NX.guests); $('lbl-guests').hidden = true; }
+// 人数は宿泊者名簿（Zoho Forms）の回答だけを使う。回答前は「未入力」でスタッフの入力は不要
+state.guests = NX && NX.guests ? String(NX.guests) : ''; $('lbl-guests').hidden = true;
+if (!NX) { state.same = 'no'; for (const id of ['lbl-arrival', 'lbl-departure', 'lbl-same']) $(id).hidden = true; }
 const stayText = s => {
   if (!s) return null;
-  const g = s.guests ? (s.guestsText || s.guests + '人') : '人数未登録';
+  const g = s.guests ? (s.guestsText || s.guests + '人') : '人数：未入力（宿泊者名簿の回答待ち）';
   return [s.inLabel + ' 〜 ' + s.outLabel, s.nights + '泊・' + g + (s.source ? '（' + s.source + '）' : '')];
 };
 function renderFixed() {
@@ -148,7 +150,7 @@ function renderFixed() {
   const add = (k, v, sub) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; if (sub) { dd.append(document.createElement('br')); const sm = document.createElement('small'); sm.textContent = sub; dd.append(sm); } dl.append(dt, dd); };
   add('清掃対象日', PREFILL.d ? PREFILL.dLabel + '　' + (PREFILL.p || '') : '（未定）');
   const pv = stayText(PV); add('前の宿泊', pv ? pv[0] : '情報なし', pv ? pv[1] : '');
-  const nx = stayText(NX); add('次の宿泊', nx ? nx[0] : '次の予約はまだありません', nx ? nx[1] + (NX.guests ? '' : '　→ 下の「次回の人数」に入力') : '');
+  const nx = stayText(NX); add('次の宿泊', nx ? nx[0] : '次の予約はまだありません', nx ? nx[1] : '');
   if (NX) add('当日チェックイン', state.cleaned === NX.in ? 'あり（清掃した日に次のお客様が到着）' : 'なし');
 }
 function autoSame() {
@@ -170,6 +172,7 @@ function refresh() {
   $('stay').textContent = nights > 0 ? nights+'泊 ／ 寝室のタオルは'+(nights >= 2 ? '2セット' : '1セット') : '日付を入力すると、泊数に応じたタオルのセット数を表示します。';
   $('stay').classList.toggle('warn', nights <= 0);
   if (nights <= 0) $('stay').textContent = 'チェックアウトはチェックインより後の日付を選んでください。';
+  if (!NX) { $('stay').textContent = '次の予約はまだありません。'; $('stay').classList.remove('warn'); }
   let total = 0, done = 0;
   for (const group of groups) {
     const active = group.items.filter(item => item.title !== '#' || $('same').value !== 'no');
@@ -189,7 +192,7 @@ function refresh() {
   const pct = Math.round(100*done/total);
   $('count').textContent = done+' / '+total+' 項目';
   $('percent').textContent = pct+'%'; $('bar').value = pct;
-  const ready = done === total && nights > 0 && !!$('same').value && !!$('staff').value.trim() && $('guests').valueAsNumber >= 1 && $('guests').validity.valid;
+  const ready = done === total && (!NX || nights > 0) && !!$('same').value && !!$('staff').value.trim();
   $('finish').disabled = !ready || !!state.completed;
   $('download').disabled = !state.completed;
   $('result').textContent = state.completed ? '✅ 完了報告済み　'+new Date(state.completed).toLocaleString('ja-JP') : ready ? 'すべての項目を確認しました。完了を記録できます。' : '作業情報を入力し、確認項目をすべて済ませてください。';
@@ -210,7 +213,7 @@ document.querySelector('main').addEventListener('input', ({target}) => {
   delete state.completed; save(); refresh();
 });
 function buildReport(when) {
-  const lines = ['宿丸一　最終確認・施錠','完了日時　'+new Date(when).toLocaleString('ja-JP'),'清掃担当者　'+$('staff').value,'清掃対象日　'+(PREFILL.d||'')+'　実施日　'+$('cleaned').value,'前回宿泊　'+(PV ? PV.in+' ～ '+PV.out+' ／ '+(PV.guests ? PV.guests+'人' : '人数未登録') : '情報なし'),'次回宿泊　'+$('arrival').value+' ～ '+$('departure').value+' ／ '+$('guests').value+'人','当日チェックイン　'+($('same').value==='yes'?'あり':'なし'),''];
+  const lines = ['宿丸一　最終確認・施錠','完了日時　'+new Date(when).toLocaleString('ja-JP'),'清掃担当者　'+$('staff').value,'清掃対象日　'+(PREFILL.d||'')+'　実施日　'+$('cleaned').value,'前回宿泊　'+(PV ? PV.in+' ～ '+PV.out+' ／ '+(PV.guests ? PV.guests+'人' : '未入力') : '情報なし'),'次回宿泊　'+$('arrival').value+' ～ '+$('departure').value+' ／ '+($('guests').value ? $('guests').value+'人' : '未入力'),'当日チェックイン　'+($('same').value==='yes'?'あり':'なし'),''];
   for (const {name,items} of groups) {
     lines.push('【'+name+'】');
     for (const item of items) {
