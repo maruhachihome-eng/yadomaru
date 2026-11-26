@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>宿丸一 清掃チェック</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f4ee;color:#192c24;font:16px/1.55 system-ui,sans-serif}main{max-width:760px;margin:auto;padding:20px 16px 56px}header{background:#173b30;color:white;padding:25px;border-radius:24px}small{letter-spacing:.12em;color:#c7dfd2}h1{margin:6px 0;font-size:clamp(26px,6vw,40px)}p{margin:.5em 0}section,details{background:#fff;border:1px solid #dce2d9;border-radius:16px;margin:12px 0;padding:15px}h2{font-size:20px;margin:0 0 10px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}input:not([type=checkbox]),textarea,select{display:block;width:100%;min-height:44px;padding:8px;border:1px solid #aab8ad;border-radius:8px;font:inherit;color:inherit;background:#fff}summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:10px;font-weight:700}summary::before{content:'›';color:#326752;font-size:24px}details[open]>summary::before{transform:rotate(90deg)}summary span{margin-left:auto;color:#326752;font-size:14px}.row{display:flex;align-items:center;gap:12px;min-height:48px;border-top:1px solid #e6ebe4;padding:7px 0;cursor:pointer}input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:#27644e}.row:has(:checked){color:#326752}.hint{font-size:14px;color:#4c6457}button{font:inherit;min-height:46px;border-radius:10px;padding:8px 16px;cursor:pointer;border:1px solid #28614c;background:#fff;color:#214c3c}button.primary{background:#235944;color:white}button:disabled{opacity:.45;cursor:default}.actions{display:flex;flex-wrap:wrap;gap:9px}progress{width:100%;height:14px;accent-color:#a9e2b8}.meter{margin-top:16px;display:flex;justify-content:space-between;gap:8px}textarea{min-height:82px}#result{min-height:1.5em}.warn{color:#8b421e}.photo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 10px 34px}.photo label.cam{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px;border:1px solid #28614c;border-radius:10px;color:#214c3c;background:#fff;cursor:pointer;font-size:15px}.photo input[type=file]{position:absolute;width:1px;height:1px;opacity:0}.photo img{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #dce2d9}.photo .st{font-size:13px;color:#4c6457}
+</style>
+<main><p id="loading" class="hint" style="padding:8px 4px">読み込み中…</p><header><small>宿丸一 ／ 清掃スタッフ用</small><h1>最終確認・施錠</h1><p>退室前に、部屋ごとに確認してください。</p><p id="target" class="hint" style="color:#c7dfd2"></p><div class="meter"><strong id="count"></strong><span id="percent"></span></div><progress id="bar" value="0" max="100"></progress></header>
+<section><h2>作業情報</h2><div class="grid"><label>清掃担当者<input id="staff" autocomplete="name"></label><label>次回の人数<input id="guests" type="number" min="1" step="1"></label><label>次回チェックイン<input id="arrival" type="date"></label><label>次回チェックアウト<input id="departure" type="date"></label><label>当日チェックイン<select id="same"><option value="">選択してください</option><option value="yes">あり</option><option value="no">なし</option></select></label></div><p id="stay" class="hint"></p></section>
+<div id="rooms"></div>
+<section><h2>異常・破損・忘れ物</h2><label>異常の有無<select id="incident"><option value="">選択してください</option><option value="no">なし</option><option value="yes">あり</option></select></label><div id="issues" hidden></div><label>補充が必要な物品・申し送り<textarea id="notes" placeholder="品名、数量、場所など"></textarea></label></section>
+<section><p class="hint" id="save">入力内容はこのブラウザーに自動保存されます。「完了を報告」を押すと、管理者に届きます。</p><div class="actions"><button class="primary" id="finish" disabled>完了を報告</button><button id="download" disabled>完了記録を保存</button><button id="reset">新しい作業を開始</button></div><p id="result" role="status"></p></section></main>
+<script>
+'use strict';
+const API = 'https://script.google.com/macros/s/AKfycbxk9daGpWq9oQXrYijqMX9SICJH8TpLzhG7yfOzlx3YtHmsf0sq9ACxrnGGBPKbxaSJ/exec';
+async function api(body) {
+  const r = await fetch(API, { method: 'POST', body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'エラー');
+  return j.result;
+}
+(async () => {
+const qs = new URLSearchParams(location.search);
+let init = null;
+for (let i = 0; i < 3 && !init; i++) {
+  try { init = await (await fetch(API + '?api=init&d=' + encodeURIComponent(qs.get('d') || '') + '&p=' + encodeURIComponent(qs.get('p') || ''))).json(); }
+  catch (e) { await new Promise(r => setTimeout(r, 1500)); }
+}
+document.getElementById('loading').remove();
+if (!init || !init.ok) { document.querySelector('main').insertAdjacentHTML('afterbegin', '<p class="warn" style="padding:16px">読み込めませんでした。電波の良い場所でページを再読み込みしてください。</p>'); return; }
+const rooms = init.result.rooms;
+const PREFILL = init.result.prefill || {};
+const issueNames = '忘れ物|家具・家電の破損|壁・床・畳の傷|リネンのシミ・破損|食器などの破損|タバコ臭|強い料理臭|大量のゴミ|その他'.split('|');
+const $ = id => document.getElementById(id);
+const key = 'yadomaru-cleaning-v1-' + (PREFILL.d || '') + '-' + (PREFILL.p || '');
+const fields = ['staff','guests','arrival','departure','same','incident','notes'];
+let state = {};
+try { state = JSON.parse(localStorage.getItem(key)) || {}; } catch {}
+function makeRow(id, title) {
+  const row = document.createElement('label');
+  row.className = 'row';
+  const input = document.createElement('input');
+  input.type = 'checkbox'; input.id = id; input.checked = state[id] === true;
+  const label = document.createElement('span'); label.textContent = title;
+  row.append(input,label);
+  return {row,input,label};
+}
+// ===== 写真（自動で縮小・圧縮してアップロード） =====
+state.photos = state.photos || {};
+const MAX_SIDE = 1600, TARGET_BYTES = 700 * 1024;
+function loadImage(file) {
+  return new Promise((ok, ng) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); ok(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); ng(new Error('画像を読み込めませんでした')); };
+    img.src = url;
+  });
+}
+async function compress(file) {
+  const img = await loadImage(file);
+  let side = MAX_SIDE, quality = 0.8, dataUrl = '';
+  for (let i = 0; i < 6; i++) {
+    const scale = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    dataUrl = c.toDataURL('image/jpeg', quality);
+    if (dataUrl.length * 0.75 <= TARGET_BYTES) break;
+    if (quality > 0.55) quality -= 0.1; else side = Math.round(side * 0.8);
+  }
+  return dataUrl;
+}
+function addPhotoControl(row, input, label, id, place) {
+  input.disabled = true;
+  label.textContent += '（下の📷で写真を送ると自動でチェック）';
+  const box = document.createElement('div'); box.className = 'photo';
+  const cam = document.createElement('label'); cam.className = 'cam'; cam.textContent = '📷 写真を撮る・選ぶ';
+  const file = document.createElement('input'); file.type = 'file'; file.accept = 'image/*'; file.multiple = true;
+  cam.append(file);
+  const st = document.createElement('span'); st.className = 'st';
+  const thumbs = document.createElement('span');
+  box.append(cam, thumbs, st);
+  row.after(box);
+  const show = () => { const n = (state.photos[id] || []).length; st.textContent = n ? n + '枚 送信済み' : ''; };
+  show();
+  file.onchange = async () => {
+    const files = [...file.files]; file.value = '';
+    for (const f of files) {
+      st.textContent = '圧縮・送信中…';
+      try {
+        const dataUrl = await compress(f);
+        const res = await api({ api: 'upload', d: PREFILL.d || '', p: PREFILL.p || '', place, dataUrl });
+        const img = document.createElement('img'); img.src = dataUrl; img.alt = place; thumbs.append(img);
+        (state.photos[id] = state.photos[id] || []).push(res.url);
+        state.photoFolder = res.folderUrl;
+        input.checked = true; state[id] = true;
+        delete state.completed; save(); refresh();
+      } catch (e) {
+        console.log('upload error', e && e.message); st.textContent = '送信できませんでした。電波の良い場所でもう一度お試しください。';
+        continue;
+      }
+      show();
+    }
+  };
+}
+const groups = rooms.map(([name,list], index) => {
+  const details = document.createElement('details');
+  details.open = index === 0;
+  const summary = document.createElement('summary');
+  const badge = document.createElement('span');
+  summary.append(name,badge); details.append(summary);
+  const items = list.split('|').map((title,i) => {
+    const id = 'r'+index+'-'+i;
+    if (title.startsWith('%')) {
+      const row = document.createElement('label'); row.className='row';
+      const select = document.createElement('select'); select.id=id;
+      select.setAttribute('aria-label',title.slice(1));
+      for (const [v,t] of [['','選択'],['none','依頼なし'],['done','設置済み']]) select.add(new Option(t,v));
+      select.value=state[id] || '';
+      row.append(title.slice(1),select); details.append(row);
+      return {row,input:select,title};
+    }
+    const item = makeRow(id,title); details.append(item.row);
+    if (title.startsWith('📷')) addPhotoControl(item.row, item.input, item.label, id, name);
+    return {...item,title};
+  });
+  $('rooms').append(details);
+  return {name,badge,items};
+});
+const incidents = issueNames.map((name,i) => makeRow('i'+i,name));
+const followup = [makeRow('photo','異常箇所を写真撮影'),makeRow('reported','管理者へ報告済み')];
+for (const item of [...incidents,...followup]) $('issues').append(item.row);
+addPhotoControl(followup[0].row, followup[0].input, followup[0].label, 'photo', '異常箇所');
+for (const id of ['arrival','departure','same']) if (!state[id] && PREFILL[id]) state[id] = PREFILL[id];
+for (const id of fields) $(id).value = state[id] || '';
+if (PREFILL.d) $('target').textContent = '清掃日：' + PREFILL.dLabel + '　' + (PREFILL.p || '');
+const isDone = item => item.input.type === 'checkbox' ? item.input.checked : !!item.input.value;
+function refresh() {
+  const nights = (Date.parse($('departure').value) - Date.parse($('arrival').value))/86400000;
+  $('stay').textContent = nights > 0 ? nights+'泊 ／ 寝室のタオルは'+(nights >= 2 ? '2セット' : '1セット') : '日付を入力すると、泊数に応じたタオルのセット数を表示します。';
+  $('stay').classList.toggle('warn', nights <= 0);
+  if (nights <= 0) $('stay').textContent = 'チェックアウトはチェックインより後の日付を選んでください。';
+  let total = 0, done = 0;
+  for (const group of groups) {
+    const active = group.items.filter(item => item.title !== '#' || $('same').value !== 'no');
+    for (const item of group.items) {
+      item.row.style.display = active.includes(item) ? '' : 'none';
+      if (item.title === '@') item.label.textContent = 'タオルを確認'+(nights > 0 ? '（'+(nights >= 2 ? '2' : '1')+'セット）' : '（2泊以上は2セット）');
+      if (item.title === '#') item.label.textContent = '当日チェックインのため浴室の水気を取る';
+    }
+    const completed = active.filter(isDone).length;
+    group.badge.textContent = completed+' / '+active.length;
+    total += active.length; done += completed;
+  }
+  const hasIssue = $('incident').value === 'yes';
+  $('issues').hidden = !hasIssue;
+  const issueCount = Number(!!$('incident').value) + (hasIssue ? Number(incidents.some(isDone)) + followup.filter(isDone).length : 0);
+  total += hasIssue ? 4 : 1; done += issueCount;
+  const pct = Math.round(100*done/total);
+  $('count').textContent = done+' / '+total+' 項目';
+  $('percent').textContent = pct+'%'; $('bar').value = pct;
+  const ready = done === total && nights > 0 && !!$('same').value && !!$('staff').value.trim() && $('guests').valueAsNumber >= 1 && $('guests').validity.valid;
+  $('finish').disabled = !ready || !!state.completed;
+  $('download').disabled = !state.completed;
+  $('result').textContent = state.completed ? '✅ 完了報告済み　'+new Date(state.completed).toLocaleString('ja-JP') : ready ? 'すべての項目を確認しました。完了を記録できます。' : '作業情報を入力し、確認項目をすべて済ませてください。';
+}
+function save() {
+  try { localStorage.setItem(key, JSON.stringify(state)); }
+  catch { $('save').textContent = '自動保存を利用できません。ページを閉じる前に完了記録を保存してください。'; }
+}
+document.querySelector('main').addEventListener('input', ({target}) => {
+  if (!target.matches('input,select,textarea') || target.type === 'file') return;
+  if (['arrival','departure'].includes(target.id)) for (const group of groups) for (const item of group.items) if (item.title === '@') { item.input.checked = false; delete state[item.input.id]; }
+  if (target.id === 'same') {
+    const item = groups.flatMap(group=>group.items).find(item=>item.title==='#');
+    item.input.checked=false; delete state[item.input.id];
+  }
+  state[target.id] = target.type === 'checkbox' ? target.checked : target.value;
+  delete state.completed; save(); refresh();
+});
+function buildReport(when) {
+  const lines = ['宿丸一　最終確認・施錠','完了日時　'+new Date(when).toLocaleString('ja-JP'),'清掃担当者　'+$('staff').value,'次回宿泊　'+$('arrival').value+' ～ '+$('departure').value+' ／ '+$('guests').value+'人','当日チェックイン　'+($('same').value==='yes'?'あり':'なし'),''];
+  for (const {name,items} of groups) {
+    lines.push('【'+name+'】');
+    for (const item of items) {
+      if (item.row.style.display === 'none') continue;
+      const detail = item.input.type === 'checkbox' ? item.label.textContent : item.title.slice(1)+'（'+item.input.selectedOptions[0].textContent+'）';
+      lines.push('✓ '+detail);
+    }
+    lines.push('');
+  }
+  lines.push('異常・破損・忘れ物　'+($('incident').value==='yes' ? incidents.filter(isDone).map(item=>item.label.textContent).join('、')+' ／ 写真撮影・管理者報告済み' : 'なし'));
+  lines.push('補充が必要な物品・申し送り', $('notes').value || 'なし');
+  const n = Object.values(state.photos || {}).reduce((a, x) => a + x.length, 0);
+  lines.push('', '写真　' + n + '枚' + (state.photoFolder ? '　' + state.photoFolder : ''));
+  return lines.join('\r\n');
+}
+$('finish').onclick = () => {
+  const when = new Date().toISOString();
+  const payload = {
+    d: PREFILL.d || '', p: PREFILL.p || '', staff: $('staff').value.trim(), guests: $('guests').value,
+    arrival: $('arrival').value, departure: $('departure').value, same: $('same').value,
+    incident: $('incident').value, issues: incidents.filter(isDone).map(item=>item.label.textContent),
+    notes: $('notes').value, report: buildReport(when),
+    photoCount: Object.values(state.photos || {}).reduce((a, x) => a + x.length, 0), photoFolder: state.photoFolder || '',
+  };
+  const done = () => { state.completed = when; save(); refresh(); $('result').textContent = '✅ 完了を報告しました。おつかれさまでした！'; };
+  $('finish').disabled = true;
+  $('result').textContent = '送信中…';
+  api(Object.assign({ api: 'submit' }, payload)).then(done)
+    .catch(() => { $('finish').disabled = false; $('result').textContent = '送信できませんでした。電波の良い場所で、もう一度「完了を報告」を押してください。'; });
+};
+$('reset').onclick = () => {
+  if (!confirm('現在の入力内容を消去し、新しい作業を始めますか？')) return;
+  state = { photos: {} };
+  document.querySelectorAll('.photo img').forEach(i => i.remove());
+  document.querySelectorAll('.photo .st').forEach(s => s.textContent = '');
+  for (const input of document.querySelectorAll('input,select,textarea')) {
+    if (input.type === 'checkbox') input.checked = false; else if (input.type !== 'file') input.value = '';
+  }
+  save(); refresh(); window.scrollTo(0,0);
+};
+$('download').onclick = () => {
+  const url = URL.createObjectURL(new Blob([buildReport(state.completed)],{type:'text/plain;charset=utf-8'}));
+  const link = document.createElement('a'); link.href=url; link.download='宿丸一_清掃完了_'+(PREFILL.d || $('arrival').value)+'.txt';
+  link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+refresh();
+})();
+</script></html>
