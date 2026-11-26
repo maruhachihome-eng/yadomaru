@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>宿丸一 清掃チェック</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f5f4ee;color:#192c24;font:16px/1.55 system-ui,sans-serif}main{max-width:760px;margin:auto;padding:20px 16px 56px}header{background:#173b30;color:white;padding:25px;border-radius:24px}small{letter-spacing:.12em;color:#c7dfd2}h1{margin:6px 0;font-size:clamp(26px,6vw,40px)}p{margin:.5em 0}section,details{background:#fff;border:1px solid #dce2d9;border-radius:16px;margin:12px 0;padding:15px}h2{font-size:20px;margin:0 0 10px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}input:not([type=checkbox]),textarea,select{display:block;width:100%;min-height:44px;padding:8px;border:1px solid #aab8ad;border-radius:8px;font:inherit;color:inherit;background:#fff}summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:10px;font-weight:700}summary::before{content:'›';color:#326752;font-size:24px}details[open]>summary::before{transform:rotate(90deg)}summary span{margin-left:auto;color:#326752;font-size:14px}.row{display:flex;align-items:center;gap:12px;min-height:48px;border-top:1px solid #e6ebe4;padding:7px 0;cursor:pointer}input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:#27644e}.row:has(:checked){color:#326752}.hint{font-size:14px;color:#4c6457}button{font:inherit;min-height:46px;border-radius:10px;padding:8px 16px;cursor:pointer;border:1px solid #28614c;background:#fff;color:#214c3c}button.primary{background:#235944;color:white}button:disabled{opacity:.45;cursor:default}.actions{display:flex;flex-wrap:wrap;gap:9px}progress{width:100%;height:14px;accent-color:#a9e2b8}.meter{margin-top:16px;display:flex;justify-content:space-between;gap:8px}textarea{min-height:82px}#result{min-height:1.5em}.warn{color:#8b421e}.photo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 10px 34px}.photo label.cam{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px;border:1px solid #28614c;border-radius:10px;color:#214c3c;background:#fff;cursor:pointer;font-size:15px}.photo input[type=file]{position:absolute;width:1px;height:1px;opacity:0}.photo img{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #dce2d9}.photo .st{font-size:13px;color:#4c6457}
+*{box-sizing:border-box}body{margin:0;background:#f5f4ee;color:#192c24;font:16px/1.55 system-ui,sans-serif}main{max-width:760px;margin:auto;padding:20px 16px 56px}header{background:#173b30;color:white;padding:25px;border-radius:24px}small{letter-spacing:.12em;color:#c7dfd2}h1{margin:6px 0;font-size:clamp(26px,6vw,40px)}p{margin:.5em 0}section,details{background:#fff;border:1px solid #dce2d9;border-radius:16px;margin:12px 0;padding:15px}h2{font-size:20px;margin:0 0 10px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}input:not([type=checkbox]),textarea,select{display:block;width:100%;min-height:44px;padding:8px;border:1px solid #aab8ad;border-radius:8px;font:inherit;color:inherit;background:#fff}summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:10px;font-weight:700}summary::before{content:'›';color:#326752;font-size:24px}details[open]>summary::before{transform:rotate(90deg)}summary span{margin-left:auto;color:#326752;font-size:14px}.row{display:flex;align-items:center;gap:12px;min-height:48px;border-top:1px solid #e6ebe4;padding:7px 0;cursor:pointer}input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:#27644e}.row:has(:checked){color:#326752}.hint{font-size:14px;color:#4c6457}button{font:inherit;min-height:46px;border-radius:10px;padding:8px 16px;cursor:pointer;border:1px solid #28614c;background:#fff;color:#214c3c}button.primary{background:#235944;color:white}button:disabled{opacity:.45;cursor:default}.actions{display:flex;flex-wrap:wrap;gap:9px}progress{width:100%;height:14px;accent-color:#a9e2b8}.meter{margin-top:16px;display:flex;justify-content:space-between;gap:8px}textarea{min-height:82px}#result{min-height:1.5em}.warn{color:#8b421e}.photo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 10px 34px}.photo label.cam{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px;border:1px solid #28614c;border-radius:10px;color:#214c3c;background:#fff;cursor:pointer;font-size:15px}.photo input[type=file]{position:absolute;width:1px;height:1px;opacity:0}.photo img{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #dce2d9}.photo .st{font-size:13px;color:#4c6457}.fixed{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}.fixed dt{color:#4c6457;font-size:14px;white-space:nowrap}.fixed dd{margin:0;font-weight:700}.fixed dd small{font-weight:400;color:#4c6457;letter-spacing:0}
 </style>
 <main><p id="loading" class="hint" style="padding:8px 4px">読み込み中…</p><header><small>宿丸一 ／ 清掃スタッフ用</small><h1>最終確認・施錠</h1><p>退室前に、部屋ごとに確認してください。</p><p id="target" class="hint" style="color:#c7dfd2"></p><div class="meter"><strong id="count"></strong><span id="percent"></span></div><progress id="bar" value="0" max="100"></progress></header>
-<section><h2>作業情報</h2><div class="grid"><label>清掃担当者<input id="staff" autocomplete="name"></label><label>次回の人数<input id="guests" type="number" min="1" step="1"></label><label>次回チェックイン<input id="arrival" type="date"></label><label>次回チェックアウト<input id="departure" type="date"></label><label>当日チェックイン<select id="same"><option value="">選択してください</option><option value="yes">あり</option><option value="no">なし</option></select></label></div><p id="stay" class="hint"></p></section>
+<section><h2>清掃対象</h2><dl id="fixed" class="fixed"></dl></section>
+<section><h2>作業情報</h2><div class="grid"><label>清掃担当者<input id="staff" autocomplete="name"></label><label>清掃した日<input id="cleaned" type="date"></label><label id="lbl-guests">次回の人数<input id="guests" type="number" min="1" step="1"></label><label id="lbl-arrival">次回チェックイン<input id="arrival" type="date"></label><label id="lbl-departure">次回チェックアウト<input id="departure" type="date"></label><label id="lbl-same">当日チェックイン<select id="same"><option value="">選択してください</option><option value="yes">あり</option><option value="no">なし</option></select></label></div><p id="stay" class="hint"></p></section>
 <div id="rooms"></div>
 <section><h2>異常・破損・忘れ物</h2><label>異常の有無<select id="incident"><option value="">選択してください</option><option value="no">なし</option><option value="yes">あり</option></select></label><div id="issues" hidden></div><label>補充が必要な物品・申し送り<textarea id="notes" placeholder="品名、数量、場所など"></textarea></label></section>
 <section><p class="hint" id="save">入力内容はこのブラウザーに自動保存されます。「完了を報告」を押すと、管理者に届きます。</p><div class="actions"><button class="primary" id="finish" disabled>完了を報告</button><button id="download" disabled>完了記録を保存</button><button id="reset">新しい作業を開始</button></div><p id="result" role="status"></p></section></main>
@@ -31,7 +32,7 @@ const PREFILL = init.result.prefill || {};
 const issueNames = '忘れ物|家具・家電の破損|壁・床・畳の傷|リネンのシミ・破損|食器などの破損|タバコ臭|強い料理臭|大量のゴミ|その他'.split('|');
 const $ = id => document.getElementById(id);
 const key = 'yadomaru-cleaning-v1-' + (PREFILL.d || '') + '-' + (PREFILL.p || '');
-const fields = ['staff','guests','arrival','departure','same','incident','notes'];
+const fields = ['staff','cleaned','guests','arrival','departure','same','incident','notes'];
 let state = {};
 try { state = JSON.parse(localStorage.getItem(key)) || {}; } catch {}
 function makeRow(id, title) {
@@ -131,6 +132,36 @@ const followup = [makeRow('photo','異常箇所を写真撮影'),makeRow('report
 for (const item of [...incidents,...followup]) $('issues').append(item.row);
 addPhotoControl(followup[0].row, followup[0].input, followup[0].label, 'photo', '異常箇所');
 for (const id of ['arrival','departure','same']) if (!state[id] && PREFILL[id]) state[id] = PREFILL[id];
+// ===== 清掃対象・前後の宿泊（固定表示） =====
+const NX = PREFILL.next || null, PV = PREFILL.prev || null;
+const ymdLocal = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+if (!state.cleaned) state.cleaned = ymdLocal(new Date());
+if (NX) { state.arrival = NX.in; state.departure = NX.out; for (const id of ['lbl-arrival', 'lbl-departure', 'lbl-same']) $(id).hidden = true; }
+if (NX && NX.guests) { state.guests = String(NX.guests); $('lbl-guests').hidden = true; }
+const stayText = s => {
+  if (!s) return null;
+  const g = s.guests ? (s.guestsText || s.guests + '人') : '人数未登録';
+  return [s.inLabel + ' 〜 ' + s.outLabel, s.nights + '泊・' + g + (s.source ? '（' + s.source + '）' : '')];
+};
+function renderFixed() {
+  const dl = $('fixed'); dl.textContent = '';
+  const add = (k, v, sub) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; if (sub) { dd.append(document.createElement('br')); const sm = document.createElement('small'); sm.textContent = sub; dd.append(sm); } dl.append(dt, dd); };
+  add('清掃対象日', PREFILL.d ? PREFILL.dLabel + '　' + (PREFILL.p || '') : '（未定）');
+  const pv = stayText(PV); add('前の宿泊', pv ? pv[0] : '情報なし', pv ? pv[1] : '');
+  const nx = stayText(NX); add('次の宿泊', nx ? nx[0] : '次の予約はまだありません', nx ? nx[1] + (NX.guests ? '' : '　→ 下の「次回の人数」に入力') : '');
+  if (NX) add('当日チェックイン', state.cleaned === NX.in ? 'あり（清掃した日に次のお客様が到着）' : 'なし');
+}
+function autoSame() {
+  if (!NX) return;
+  const v = state.cleaned === NX.in ? 'yes' : 'no';
+  if (state.same !== v) {
+    state.same = v; $('same').value = v;
+    const item = groups.flatMap(g => g.items).find(i => i.title === '#');
+    if (item) { item.input.checked = false; delete state[item.input.id]; }
+  }
+}
+autoSame();
+renderFixed();
 for (const id of fields) $(id).value = state[id] || '';
 if (PREFILL.d) $('target').textContent = '清掃日：' + PREFILL.dLabel + '　' + (PREFILL.p || '');
 const isDone = item => item.input.type === 'checkbox' ? item.input.checked : !!item.input.value;
@@ -170,6 +201,7 @@ function save() {
 document.querySelector('main').addEventListener('input', ({target}) => {
   if (!target.matches('input,select,textarea') || target.type === 'file') return;
   if (['arrival','departure'].includes(target.id)) for (const group of groups) for (const item of group.items) if (item.title === '@') { item.input.checked = false; delete state[item.input.id]; }
+  if (target.id === 'cleaned') { state.cleaned = target.value; autoSame(); renderFixed(); }
   if (target.id === 'same') {
     const item = groups.flatMap(group=>group.items).find(item=>item.title==='#');
     item.input.checked=false; delete state[item.input.id];
@@ -178,7 +210,7 @@ document.querySelector('main').addEventListener('input', ({target}) => {
   delete state.completed; save(); refresh();
 });
 function buildReport(when) {
-  const lines = ['宿丸一　最終確認・施錠','完了日時　'+new Date(when).toLocaleString('ja-JP'),'清掃担当者　'+$('staff').value,'次回宿泊　'+$('arrival').value+' ～ '+$('departure').value+' ／ '+$('guests').value+'人','当日チェックイン　'+($('same').value==='yes'?'あり':'なし'),''];
+  const lines = ['宿丸一　最終確認・施錠','完了日時　'+new Date(when).toLocaleString('ja-JP'),'清掃担当者　'+$('staff').value,'清掃対象日　'+(PREFILL.d||'')+'　実施日　'+$('cleaned').value,'前回宿泊　'+(PV ? PV.in+' ～ '+PV.out+' ／ '+(PV.guests ? PV.guests+'人' : '人数未登録') : '情報なし'),'次回宿泊　'+$('arrival').value+' ～ '+$('departure').value+' ／ '+$('guests').value+'人','当日チェックイン　'+($('same').value==='yes'?'あり':'なし'),''];
   for (const {name,items} of groups) {
     lines.push('【'+name+'】');
     for (const item of items) {
@@ -198,7 +230,7 @@ $('finish').onclick = () => {
   const when = new Date().toISOString();
   const payload = {
     d: PREFILL.d || '', p: PREFILL.p || '', staff: $('staff').value.trim(), guests: $('guests').value,
-    arrival: $('arrival').value, departure: $('departure').value, same: $('same').value,
+    arrival: $('arrival').value, departure: $('departure').value, same: $('same').value, cleaned: $('cleaned').value,
     incident: $('incident').value, issues: incidents.filter(isDone).map(item=>item.label.textContent),
     notes: $('notes').value, report: buildReport(when),
     photoCount: Object.values(state.photos || {}).reduce((a, x) => a + x.length, 0), photoFolder: state.photoFolder || '',
