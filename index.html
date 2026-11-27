@@ -5,7 +5,7 @@
 </style>
 <main><p id="loading" class="hint" style="padding:8px 4px">読み込み中…</p><header><small>宿丸一 ／ 清掃スタッフ用</small><h1>最終確認・施錠</h1><p>退室前に、部屋ごとに確認してください。</p><p id="target" class="hint" style="color:#c7dfd2"></p><div class="meter"><strong id="count"></strong><span id="percent"></span></div><progress id="bar" value="0" max="100"></progress></header>
 <section><h2>清掃対象</h2><dl id="fixed" class="fixed"></dl></section>
-<section><h2>作業情報</h2><div class="grid"><label>清掃担当者<input id="staff" autocomplete="name"></label><label>清掃した日<input id="cleaned" type="date"></label><label id="lbl-guests">次回の人数<input id="guests" type="number" min="1" step="1"></label><label id="lbl-arrival">次回チェックイン<input id="arrival" type="date"></label><label id="lbl-departure">次回チェックアウト<input id="departure" type="date"></label><label id="lbl-same">当日チェックイン<select id="same"><option value="">選択してください</option><option value="yes">あり</option><option value="no">なし</option></select></label></div><p id="stay" class="hint"></p></section>
+<section><h2>作業情報</h2><div class="grid"><label>清掃担当者<input id="staff" autocomplete="name"></label><label>清掃した日<input id="cleaned" type="date"></label><label>開始時刻<input id="start" type="time"></label><label>終了時刻<input id="end" type="time"></label><label id="lbl-guests">次回の人数<input id="guests" type="number" min="1" step="1"></label><label id="lbl-arrival">次回チェックイン<input id="arrival" type="date"></label><label id="lbl-departure">次回チェックアウト<input id="departure" type="date"></label><label id="lbl-same">当日チェックイン<select id="same"><option value="">選択してください</option><option value="yes">あり</option><option value="no">なし</option></select></label></div><p class="hint">開始時刻は［清掃を開始］を押した時刻（押していなければこのページを開いた時刻）が入ります。違うときは直してください。終了時刻は空欄のままなら「完了を報告」を押した時刻になります。</p><p id="stay" class="hint"></p></section>
 <div id="rooms"></div>
 <section><h2>異常・破損・忘れ物</h2><label>異常の有無<select id="incident"><option value="">選択してください</option><option value="no">なし</option><option value="yes">あり</option></select></label><div id="issues" hidden></div><label>補充が必要な物品・申し送り<textarea id="notes" placeholder="品名、数量、場所など"></textarea></label></section>
 <section><p class="hint" id="save">入力内容はこのブラウザーに自動保存されます。「完了を報告」を押すと、管理者に届きます。</p><div class="actions"><button class="primary" id="finish" disabled>完了を報告</button><button id="download" disabled>完了記録を保存</button><button id="reset">新しい作業を開始</button></div><p id="result" role="status"></p></section></main>
@@ -32,7 +32,7 @@ const PREFILL = init.result.prefill || {};
 const issueNames = '忘れ物|家具・家電の破損|壁・床・畳の傷|リネンのシミ・破損|食器などの破損|タバコ臭|強い料理臭|大量のゴミ|その他'.split('|');
 const $ = id => document.getElementById(id);
 const key = 'yadomaru-cleaning-v1-' + (PREFILL.d || '') + '-' + (PREFILL.p || '');
-const fields = ['staff','cleaned','guests','arrival','departure','same','incident','notes'];
+const fields = ['staff','cleaned','start','end','guests','arrival','departure','same','incident','notes'];
 let state = {};
 try { state = JSON.parse(localStorage.getItem(key)) || {}; } catch {}
 function makeRow(id, title) {
@@ -136,6 +136,10 @@ for (const id of ['arrival','departure','same']) if (!state[id] && PREFILL[id]) 
 const NX = PREFILL.next || null, PV = PREFILL.prev || null;
 const ymdLocal = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 if (!state.cleaned) state.cleaned = ymdLocal(new Date());
+// 開始時刻：［清掃を開始］を押していればその時刻、なければチェックリストを初めて開いた時刻（あとで直せる）
+const hmNow = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+if (PREFILL.started && !state.startEdited) state.start = PREFILL.started;
+if (!state.start) { state.start = hmNow(); save(); }
 if (NX) { state.arrival = NX.in; state.departure = NX.out; for (const id of ['lbl-arrival', 'lbl-departure', 'lbl-same']) $(id).hidden = true; }
 // 人数は宿泊者名簿（Zoho Forms）の回答だけを使う。回答前は「未入力」でスタッフの入力は不要
 state.guests = NX && NX.guests ? String(NX.guests) : ''; $('lbl-guests').hidden = true;
@@ -192,7 +196,7 @@ function refresh() {
   const pct = Math.round(100*done/total);
   $('count').textContent = done+' / '+total+' 項目';
   $('percent').textContent = pct+'%'; $('bar').value = pct;
-  const ready = done === total && (!NX || nights > 0) && !!$('same').value && !!$('staff').value.trim();
+  const ready = done === total && (!NX || nights > 0) && !!$('same').value && !!$('staff').value.trim() && !!$('start').value;
   $('finish').disabled = !ready || !!state.completed;
   $('download').disabled = !state.completed;
   $('result').textContent = state.completed ? '✅ 完了報告済み　'+new Date(state.completed).toLocaleString('ja-JP') : ready ? 'すべての項目を確認しました。完了を記録できます。' : '作業情報を入力し、確認項目をすべて済ませてください。';
@@ -205,6 +209,7 @@ document.querySelector('main').addEventListener('input', ({target}) => {
   if (!target.matches('input,select,textarea') || target.type === 'file') return;
   if (['arrival','departure'].includes(target.id)) for (const group of groups) for (const item of group.items) if (item.title === '@') { item.input.checked = false; delete state[item.input.id]; }
   if (target.id === 'cleaned') { state.cleaned = target.value; autoSame(); renderFixed(); }
+  if (target.id === 'start') state.startEdited = true;
   if (target.id === 'same') {
     const item = groups.flatMap(group=>group.items).find(item=>item.title==='#');
     item.input.checked=false; delete state[item.input.id];
@@ -213,7 +218,7 @@ document.querySelector('main').addEventListener('input', ({target}) => {
   delete state.completed; save(); refresh();
 });
 function buildReport(when) {
-  const lines = ['宿丸一　最終確認・施錠','完了日時　'+new Date(when).toLocaleString('ja-JP'),'清掃担当者　'+$('staff').value,'清掃対象日　'+(PREFILL.d||'')+'　実施日　'+$('cleaned').value,'前回宿泊　'+(PV ? PV.in+' ～ '+PV.out+' ／ '+(PV.guests ? PV.guests+'人' : '未入力') : '情報なし'),'次回宿泊　'+$('arrival').value+' ～ '+$('departure').value+' ／ '+($('guests').value ? $('guests').value+'人' : '未入力'),'当日チェックイン　'+($('same').value==='yes'?'あり':'なし'),''];
+  const lines = ['宿丸一　最終確認・施錠','完了日時　'+new Date(when).toLocaleString('ja-JP'),'清掃担当者　'+$('staff').value,'清掃対象日　'+(PREFILL.d||'')+'　実施日　'+$('cleaned').value,'作業時間　'+$('start').value+' ～ '+($('end').value || hmNow()),'前回宿泊　'+(PV ? PV.in+' ～ '+PV.out+' ／ '+(PV.guests ? PV.guests+'人' : '未入力') : '情報なし'),'次回宿泊　'+$('arrival').value+' ～ '+$('departure').value+' ／ '+($('guests').value ? $('guests').value+'人' : '未入力'),'当日チェックイン　'+($('same').value==='yes'?'あり':'なし'),''];
   for (const {name,items} of groups) {
     lines.push('【'+name+'】');
     for (const item of items) {
@@ -231,9 +236,10 @@ function buildReport(when) {
 }
 $('finish').onclick = () => {
   const when = new Date().toISOString();
+  if (!$('end').value) { $('end').value = hmNow(); state.end = $('end').value; save(); }
   const payload = {
     d: PREFILL.d || '', p: PREFILL.p || '', staff: $('staff').value.trim(), guests: $('guests').value,
-    arrival: $('arrival').value, departure: $('departure').value, same: $('same').value, cleaned: $('cleaned').value,
+    arrival: $('arrival').value, departure: $('departure').value, same: $('same').value, cleaned: $('cleaned').value, start: $('start').value, end: $('end').value,
     incident: $('incident').value, issues: incidents.filter(isDone).map(item=>item.label.textContent),
     notes: $('notes').value, report: buildReport(when),
     photoCount: Object.values(state.photos || {}).reduce((a, x) => a + x.length, 0), photoFolder: state.photoFolder || '',
