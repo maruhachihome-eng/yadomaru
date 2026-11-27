@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宿丸一 清掃の出欠</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f5f4ee;color:#192c24;font:16px/1.55 system-ui,-apple-system,"Hiragino Sans",sans-serif}
+main{max-width:640px;margin:auto;padding:16px 16px 56px}
+header{background:#173b30;color:#fff;padding:20px 22px;border-radius:22px}
+header small{letter-spacing:.12em;color:#c7dfd2}
+h1{margin:4px 0 2px;font-size:26px}
+#hello{margin:0;color:#c7dfd2;font-size:15px}
+.card{background:#fff;border:1px solid #dce2d9;border-radius:16px;margin:12px 0;padding:14px 15px}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.date{font-size:20px;font-weight:700}
+.state{font-size:14px;color:#4c6457}
+.who{font-size:14px;color:#4c6457;margin:6px 0 10px}
+.who b{color:#192c24;font-weight:600}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font:inherit;min-height:48px;border-radius:12px;border:1.5px solid #28614c;background:#fff;color:#214c3c;cursor:pointer}
+button.on.join{background:#235944;border-color:#235944;color:#fff}
+button.on.no{background:#8b421e;border-color:#8b421e;color:#fff}
+button:disabled{opacity:.5;cursor:default}
+.mine{font-size:14px;margin-top:8px;color:#326752}
+.mine.todo{color:#b4231b;font-weight:700}
+.star{display:inline-block;background:#fff3cd;color:#7a5a00;border-radius:8px;padding:1px 8px;font-size:13px;font-weight:700;margin-left:6px}
+details{margin-top:10px;border-top:1px solid #e6ebe4;padding-top:6px}
+summary{cursor:pointer;min-height:40px;display:flex;align-items:center;font-size:15px;color:#326752;font-weight:600}
+.person{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed #e6ebe4}
+.person:first-of-type{border-top:0}
+.person .nm{flex:1;min-width:0;overflow-wrap:anywhere}
+.person button{min-height:38px;padding:0 10px;font-size:14px}
+.person label{display:flex;align-items:center;gap:4px;font-size:13px;color:#4c6457;white-space:nowrap}
+.person input{width:20px;height:20px;accent-color:#27644e}
+.pick{margin-top:8px;width:100%;background:#235944;color:#fff;border-color:#235944}
+.msg{padding:14px;border-radius:14px;background:#fff;border:1px solid #dce2d9;margin:12px 0}
+.err{color:#8b421e}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#192c24;color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+#toast.show{opacity:1}
+.empty{color:#4c6457;text-align:center;padding:30px 0}
+</style>
+<main>
+  <header><small>宿丸一 ／ 清掃スタッフ用</small><h1>清掃の出欠</h1><p id="hello">読み込み中…</p></header>
+  <div id="list"><p class="msg">LINEで本人確認をしています…</p></div>
+</main>
+<div id="toast" role="status"></div>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+'use strict';
+const LIFF_ID = '2012830094-dRoSbguT';
+const API = 'https://script.google.com/macros/s/AKfycbxk9daGpWq9oQXrYijqMX9SICJH8TpLzhG7yfOzlx3YtHmsf0sq9ACxrnGGBPKbxaSJ/exec';
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+let idToken = '', data = null, busy = false;
+
+function toast(t) { const x = $('toast'); x.textContent = t; x.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => x.classList.remove('show'), 2500); }
+function fail(t) { $('list').replaceChildren(el('p', { className: 'msg err', textContent: t })); }
+
+async function call(body) {
+  const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ idToken }, body)) });
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || 'エラーが起きました');
+  return j.result;
+}
+
+async function act(body, okText) {
+  if (busy) return;
+  busy = true; document.querySelectorAll('button').forEach(b => b.disabled = true);
+  try { data = await call(body); render(); toast(okText); }
+  catch (e) { toast(e.message); render(); }
+  finally { busy = false; }
+}
+
+function render() {
+  const { me, items, max } = data;
+  $('hello').textContent = me.name + ' さん' + (me.isOwner ? '（管理者）' : '');
+  if (!items.length) { $('list').replaceChildren(el('p', { className: 'empty', textContent: '今後90日の清掃予定はありません。' })); return; }
+  const todo = items.filter(i => !i.mine).length;
+  const cards = items.map(it => {
+    const seg = el('div', { className: 'seg' },
+      el('button', { className: 'join' + (it.mine === '参加' ? ' on' : ''), textContent: '参加', onclick: () => it.mine !== '参加' && act({ api: 'attend_set', d: it.d, p: it.p, answer: '参加' }, it.label + '：参加にしました') }),
+      el('button', { className: 'no' + (it.mine === '不参加' ? ' on' : ''), textContent: '不参加', onclick: () => it.mine !== '不参加' && act({ api: 'attend_set', d: it.d, p: it.p, answer: '不参加' }, it.label + '：不参加にしました') }));
+    const mine = el('p', { className: 'mine' + (it.mine ? '' : ' todo'), textContent: it.mine ? 'あなたの回答：' + it.mine : '❗ まだ回答していません' });
+    if (it.mineAssigned) mine.append(el('span', { className: 'star', textContent: '⭐ 担当' }));
+    const who = el('p', { className: 'who' });
+    who.append('参加：', el('b', { textContent: it.join.join('、') || 'なし' }), '　不参加：', el('b', { textContent: it.no.join('、') || 'なし' }));
+    if (it.assigned.length) who.append(el('br'), '担当：', el('b', { textContent: it.assigned.join('、') }));
+    const card = el('section', { className: 'card' },
+      el('div', { className: 'top' }, el('span', { className: 'date', textContent: it.label + '　' + it.p }), el('span', { className: 'state', textContent: it.state })),
+      who, seg, mine);
+    if (me.isOwner && it.answers) card.append(ownerPanel(it, max));
+    return card;
+  });
+  const head = el('p', { className: 'msg', textContent: todo ? '❗ 未回答が' + todo + '件あります。参加・不参加をタップしてください。' : '全部回答済みです。ありがとうございます！ 変更もここからできます。' });
+  $('list').replaceChildren(head, ...cards);
+}
+
+// 三宅さん用：全員の回答の修正と、担当の決定
+function ownerPanel(it, max) {
+  const box = el('details', {}, el('summary', { textContent: 'スタッフの回答を直す・担当を決める' }));
+  const checks = [];
+  it.answers.forEach(a => {
+    const row = el('div', { className: 'person' }, el('span', { className: 'nm', textContent: a.name + (a.answer ? '' : '（未回答）') }));
+    for (const ans of ['参加', '不参加']) {
+      row.append(el('button', { className: (ans === '参加' ? 'join' : 'no') + (a.answer === ans ? ' on' : ''), textContent: ans,
+        onclick: () => a.answer !== ans && act({ api: 'attend_set', d: it.d, p: it.p, answer: ans, target: a.id }, a.name + 'さんを' + ans + 'にしました') }));
+    }
+    if (a.answer === '参加') {
+      const cb = el('input', { type: 'checkbox', checked: a.assigned });
+      cb.dataset.id = a.id; checks.push(cb);
+      row.append(el('label', {}, cb, '担当'));
+    }
+    box.append(row);
+  });
+  if (checks.length) {
+    box.append(el('button', { className: 'pick', textContent: '担当を決定してグループに知らせる', onclick: () => {
+      const ids = checks.filter(c => c.checked).map(c => c.dataset.id);
+      if (!ids.length) return toast('担当にする人にチェックを入れてください');
+      if (ids.length > max) return toast('担当は' + max + '名までです');
+      act({ api: 'attend_pick', d: it.d, p: it.p, ids }, '担当を決めました');
+    } }));
+  }
+  return box;
+}
+
+(async () => {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+    idToken = liff.getIDToken();
+    if (!idToken) throw new Error('LINEの本人確認ができませんでした。');
+    for (let i = 0; i < 3; i++) {
+      try { data = await call({ api: 'attend_init' }); break; }
+      catch (e) { if (i === 2 || /メンバー|設定|ログイン/.test(e.message)) throw e; await new Promise(r => setTimeout(r, 1500)); }
+    }
+    render();
+  } catch (e) { $('hello').textContent = ''; fail(e.message || String(e)); }
+})();
+</script>
+</html>
